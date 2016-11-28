@@ -1,0 +1,362 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="rfc2629.xslt"?>
+<!DOCTYPE rfc SYSTEM "rfc2629.dtd">
+
+<?rfc toc="yes" ?>
+<?rfc compact="yes" ?>
+<?rfc symrefs="yes" ?>
+<?rfc subcompact="no" ?>
+<?rfc comments="yes" ?>
+<?rfc inline="yes" ?>
+
+<rfc ipr="trust200902" docName="draft-vanrein-ldap-pos-00" category="std">
+
+<front>
+
+	<title abbrev="LDAP-pos">Order and Grouping for LDAP Objects and Attributes</title>
+
+	<author initials="R" surname="Van Rein" fullname="Rick van Rein">
+		<organization>ARPA2.net</organization>
+		<address>
+			<postal>
+				<street>Haarlebrink 5</street>
+				<city>Enschede</city>
+				<region>Overijssel</region>
+				<code>7544 WP</code>
+				<country>The Netherlands</country>
+			</postal>
+			<email>rick@openfortress.nl</email>
+		</address>
+	</author>
+
+	<date day="3" month="September" year="2515"/>
+
+	<abstract>
+	<t>LDAP treats objects within a result as an unrelated set.  Similarly,
+	the attributes within an object are treated as an unrelated set.  This
+	specification introduces annotations to specify relations between set
+	elements, with applications such as grouping and partial or complete
+	ordering.</t>
+	</abstract>
+
+<!--
+
+CHANGES FROM 00 TO 01:
+
+-->
+
+</front>
+
+
+<middle>
+
+<section title="Introduction" anchor="intro">
+
+<t>The attributes found in an LDAP object are delivered as a set, meaning that
+any assumptions about their order or other relations are invalid.  This is a
+nice and general model, but it is not the best for all possible applications.
+To circumvent this, attributes would have to contain index numbers, which is
+not always desirable, certainly not when it makes existing attribute types
+unusable for an application.</t>
+
+<t>A similar remark can be made about the objects that result from an LDAP query.
+These too are delivered as an unordered set without any structure, and applications
+that desire some more structure might have to resort to additional attributes.</t>
+
+<t>Both these problems are solved herein.  Attributes are adorned with an
+attribute option "pos-" and an auxiliary class with an attribute is added
+to adorn objects.  The information stored in them will be known as
+Positional Information, and these can be used for grouping and sorting, as
+well as for viewing only parts of a data set.</t>
+
+</section>
+
+<section title="Positional Information" anchor="pos">
+
+<t>Positional Information is a sequence of words, separated by a dash.
+The place where it is used determines the characters composing words; in
+an attribute option, only letters and digits remain, and the attribute form
+allows a few more symbols.</t>
+
+<t>Conceptually, Positional Information is intended to define a partial-order
+relation on attributes.  This choice was made because many parts in real
+life seem to take this structure; and because its use ranges from
+a fully ordered list and a fully unordered set.  The notation is in fact
+a bit more general, and the word SHOULD <xref target="RFC2119"/> is used
+to mark rules that cause adherence to the partial order.</t>
+
+<t>The notation of Positional Information is in one or more words w[i], where
+i is the index of each word, starting at 0.  Any index that has no word in the
+notation is considered equivalent to an empty word, which will be used as a
+wildcard.</t>
+
+<t>The set of words w[i] is specific to an object or attribute; we will assume
+that j ranges over these objects (or attributes) that an application might
+want to compare, and define PI(j) as a function yielding the w[i].  So we have
+PI(j)[i] as the notation of the i'th word of Positional Information for
+object or attribute j in a set under consideration.  When no Positional Information
+is supplied for j, then PI(j) is defined to consist solely of empty words.</t>
+
+<t>The ordering rules between two words w and v are as follows:
+<list style="numbers">
+<t>if w and/or v is the empty word, then no ordering statement can be made; else</t>
+<t>if w and v are the same words, then they are conceptually ordered in the same position; else</t>
+<t>w and v are ordered as under the ISO C standard for strcmp().</t>
+</list></t>
+
+<t>Note how this implies transitivity within each word: if w&lt;=v and v&lt;=u, then w&lt;=u.  It also implies reflexivity: w&lt;=w.  Finally, it implies antisymmetry: if w&lt;=v and v&lt;=w then w==v.  This is easy because with the exception of empty word handling, the prescribed order is a complete order.</t>
+
+<t>This is why PI(j) defines multiple words.  Given the possibility of using an
+empty word to avoid making a statement about order, it is possible to state
+nothing about order; this allows a first word to state things about the order
+between some words, a second word to state things about the order of other (and
+possibly overlapping) words, and so on.  The result would have some order, but not
+a complete order -- the idea of a partial order.</t>
+
+<t>Applications should be mindful about words that they want to consider at the
+same time; taken together, these words could define a cycle, which
+SHOULD be avoided if a partial order is being targeted.  In cases where cycles
+occur, the ordering agent MAY consider the results in any order it likes.</t>
+
+<t>Note that mostly, there will be application-specific reasons to identify words.
+The words are even likely to have some meaning in terms of the application.  If
+this is the case, then application logic is also likely to dictate a regimen that
+avoids cycles where they are unwanted.  It should however not be taken too lightly
+that the Positional Information is more expressive than a partial order.</t>
+
+</section>
+
+<section title="Encoding in LDAP" anchor="encod">
+
+<t>The following subsections specify how Positional Information is encoded
+in LDAP.</t>
+
+<section title="Attribute Option" anchor="encod.atopt">
+
+<t>Attribute options starting with "pos-" are used to relay Positional Information
+about the attributes within an object.  The notation starts with "pos-", followed by
+the words in w[i] with an intermediate hyphen.  There is no use for trailing
+hyphens, so these can be safely trimmed off.</t>
+
+<t>This attribute option SHOULD NOT be used in responses, unless the LDAP Control
+defined below has been selected.</t>
+
+<t>TODO:SPEC</t>
+
+</section>
+
+<section title="Auxiliary Class" anchor="encod.cls">
+
+<t>The auxiliary class positionedObjectClass adds an attribute objectPosition
+whose syntax is a PrintableString <xref target="RFC4517"/> and whose contents are a
+sequence of hyphen-separated words.  Trailing hyphens have no meaning and can be
+safely trimmed off.</t>
+
+<t>TODO:SPEC</t>
+
+</section>
+
+<section title="LDAP Control" anchor="encod.ctl">
+
+<t>The following LDAP Control must be used be clients intending to process
+Positional Information.  Servers willing to serve it should publish it.</t>
+
+<t>TODO:SPEC</t>
+
+</section>
+
+</section>
+
+<section title="Use Cases" anchor="use">
+
+<t>The subsections below demonstrate a few common useses of Positional Information.</t>
+
+<section title="List or Complete Order" anchor="use.list">
+
+<t>A list is a completely ordered set.  This can be achieved with one word only.
+The word might be a 3-digit number.  It is not required that all numbers are
+assigned consecutively.  To insert a new value in between two consecutively
+numbered values, it is possible to copy the lower value and append a digit.</t>
+
+<t>An example of this use is the following list of attribute, with an entry "006.5"
+that seems to have been added later:</t>
+
+<figure><artwork><![CDATA[
+   cn;pos-000: M
+   cn;pos-006: Andy Renton
+   cn;pos-0065: Rick van Rein
+   cn;pos-007: James Bond
+   cn;pos-009: Thunderball
+]]></artwork></figure>
+
+<t>It would also have been possible to just use "cn;pos-" or just "cn" for M.
+Note how these items could have been presented in any order, like the set that
+LDAP delivers, and can then easily be sorted into this order again, except
+that M could show up anywhere had she been stripped of her 000 number.</t>
+
+</section>
+
+<section title="Partitioning into Groups" anchor="use.part">
+
+<t>Partitioning is a manner of grouping that assigns each entry to a subset.
+This can be helpful to see that values belong together, and should be processed
+as a group.  This is especially helpful if groups of attributes within an object
+should be related.</t>
+
+<t>To make this possible, simply assign the same word value in the
+Positional Information:</t>
+
+<figure><artwork><![CDATA[
+   cn;pos-casroy: Casino Royale
+   cn;pos-mnrake: From Russia, with Love
+   cn;pos-goldfg: Goldfinger
+   locality;pos-casroy: Casino Royale-les-Eaux
+   locality;pos-russia: Istanbul
+   locality;pos-russia: Orient Express
+   locality;pos-goldfg: Fort Knox
+]]></artwork></figure>
+
+<t>Note how there are multiple localities defined for "pos-russia", where the
+flexible nature of LDAP extends into the Positional Information.</t>
+
+</section>
+
+<section title="Multiple Views" anchor="use.view">
+
+<t>Many real-life applications would sort information differently when viewing it
+from another angle.  This may be reflected by having multiple words in the
+Positional Information:</t>
+
+<figure><artwork><![CDATA[
+   cn;pos-casroy-film: Casino Royale
+   cn;pos-casroy-lady: Vesper Lynd
+   cn;pos-russia-film: From Russia, with Love
+   cn;pos-russia-lady: Tatiana Romanova
+   cn;pos-goldfg-film: Goldfinger
+   cn;pos-goldfg-lady: Pussy Galore
+]]></artwork></figure>
+
+<t>It is possible to select from these sets, and orden them, depending on the
+application's needs.</t>
+
+<t>As an alternative model, the above information could also have been stored in
+independent LDAP objects:</t>
+
+<figure><artwork><![CDATA[
+   dn: cn=Casino Royale, dc=example, dc=com
+   cn: Casino Royale
+   objectClass: positionedObjectClass 
+   objectPosition: casroy-film
+
+   dn: cn=Vesper Lynd, dc=example, dc=com
+   cn: Vesper Lynd
+   objectClass: positionedObjectClass 
+   objectPosition: casroy-lady
+
+   dn: cn=From Russia\, with Love, dc=example, dc=com
+   cn: From Russia, with Love
+   objectClass: positionedObjectClass 
+   objectPosition: russia-fim
+
+   dn: cn=Tatiana Romanova, dc=example, dc=com
+   cn: Tatiana Romanova
+   objectClass: positionedObjectClass 
+   objectPosition: russia-lady
+
+   dn: cn=Goldfinger, dc=example, dc=com
+   cn: Goldfinger
+   objectClass: positionedObjectClass 
+   objectPosition: goldfg-film
+
+   dn: cn=Pussy Galore, dc=example, dc=com
+   cn: Pussy Galore
+   objectClass: positionedObjectClass 
+   objectPosition: goldfg-lady
+]]></artwork></figure>
+
+<t>The ability to select, sort and group on the Positional Information is
+equivalent; in fact, it is as powerful as SQL table selection and formatting
+control [TODO:INFOREF].</t>
+
+</section>
+
+<section title="Hierarchy" anchor="use.hier">
+
+<t>Hierarchies are among the most complex uses of Positional Information.
+Since hierarchies may vary depending on the view taken on the data, it is even
+possible to have multiple hierarchies by defining multiple "pos-" options with
+independent Positional Information in each; when ordering objects, it is possible
+to define multiple objectPosition attributes and sorting each in a different
+hierarchy; in both cases, it may help to start with a distinctive word.
+The example below however, only takes a single
+view and so it only defines one hierarchy, and nothing but a hierarchy.</t>
+
+<t>Consider a hierarchy of nations, with secret services underneath and
+at the next level there may be secret agents, possibly with their helpers.
+Though this description is merely a local convention, it is helpful in
+constructing the Positional Information for these attributes.
+We shall write the words in top-down order:</t>
+
+<figure><artwork><![CDATA[
+   uid;pos-us:                6F963325-7160-4D52-AD23-C6E01BCBCB16
+   uid;pos-us-cia:            849F41CC-AD5B-41C9-BB48-0141F26E2625
+   uid;pos-us-cia-leiter:     62568699-49FF-4ADC-A2B7-6AEEDE93D69E
+   uid;pos-us-nsa:            66A60DBE-AC00-4F8F-ACAD-71021B6D047C
+   uid;pos-gb:                35453E08-63E6-4A7E-8888-371AEB2DE251
+   uid;pos-gb-mi5:            232F54D1-922E-48EB-A0F8-278C4B67E4F8
+   uid;pos-gb-mi5-M:          34C32468-8BFF-418A-BC62-0B21CCD83473
+   uid;pos-gb-mi5-007:        C41A1303-F396-4F7E-A8F3-099947BE8761
+   uid;pos-gb-mi5-007-leiter: 62568699-49FF-4ADC-A2B7-6AEEDE93D69E
+   uid;pos-gb-mi6:            BAD1ADCC-23C0-44C8-BFD8-766AFF2ACA67
+]]></artwork></figure>
+
+<t>Note how the each word acts as a partitioning value for all the following words;
+the first word is like a partition and the second word is a sub-partition.  Also
+note that the number of levels is not restricted in any way by the formalism of
+Positional Information, as it implicitly adds empty words to the end of the
+shorter word list; and note that such additional empty words add no meaning.</t>
+
+</section>
+
+</section>
+
+
+<section title="IANA Considerations">
+
+<t>TODO</t>
+
+</section>
+
+<section title="Security Considerations">
+
+<t>TODO</t>
+
+</section>
+
+</middle>
+
+
+<back>
+
+<references title="Normative References">
+<?rfc include="reference.RFC.4517.xml"?>
+<?rfc include="reference.RFC.2119.xml"?>
+</references>
+
+<!--
+<references title="Informative References">
+</references>
+-->
+
+<section title="Acknowledgements" anchor="ack">
+
+<!--
+<t>Thanks go to XXX for useful discussions during the creation of this
+document.</t>
+-->
+
+</section>
+
+</back>
+
+</rfc>
